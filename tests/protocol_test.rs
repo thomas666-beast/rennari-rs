@@ -89,7 +89,10 @@ fn encode_rejects_bad_names() {
         Err(ProtocolError::InvalidEventName)
     ));
     assert!(matches!(
-        encode(&Frame::new("bad\n", serde_json::json!({})), Serializer::Msgpack),
+        encode(
+            &Frame::new("bad\n", serde_json::json!({})),
+            Serializer::Msgpack
+        ),
         Err(ProtocolError::InvalidEventName)
     ));
 }

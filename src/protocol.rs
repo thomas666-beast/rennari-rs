@@ -151,9 +151,8 @@ pub fn encode(frame: &Frame, serializer: Serializer) -> Result<Vec<u8>, Protocol
             return Err(ProtocolError::InvalidOffset);
         }
     }
-    let nsp = if frame.namespace == "/" {
-        None
-    } else if frame.namespace.is_empty() {
+
+    let nsp = if frame.namespace.is_empty() || frame.namespace == "/" {
         None
     } else {
         if !valid_namespace_name(&frame.namespace) {
@@ -174,11 +173,17 @@ pub fn encode(frame: &Frame, serializer: Serializer) -> Result<Vec<u8>, Protocol
         Serializer::Msgpack => {
             rmp_serde::to_vec_named(&raw).map_err(|e| ProtocolError::Serialize(e.to_string()))
         }
-        Serializer::Json => serde_json::to_vec(&raw).map_err(|e| ProtocolError::Serialize(e.to_string())),
+        Serializer::Json => {
+            serde_json::to_vec(&raw).map_err(|e| ProtocolError::Serialize(e.to_string()))
+        }
     }
 }
 
-pub fn decode(bytes: &[u8], serializer: Serializer, max_bytes: usize) -> Result<Frame, ProtocolError> {
+pub fn decode(
+    bytes: &[u8],
+    serializer: Serializer,
+    max_bytes: usize,
+) -> Result<Frame, ProtocolError> {
     if bytes.is_empty() {
         return Err(ProtocolError::EmptyInput);
     }
