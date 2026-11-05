@@ -1,7 +1,7 @@
 [package]
 name = "rennari"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Rust client and server for the Rennari protocol"
 license = "MIT"
 repository = "https://github.com/thomas666-beast/rennari-rs"
@@ -21,3 +21,11 @@ http = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+
+[[example]]
+name = "app"
+path = "examples/app.rs"
+
+[[example]]
+name = "client"
+path = "examples/client.rs"
