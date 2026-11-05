@@ -4,8 +4,8 @@ pub mod server;
 
 pub use client::{Client, ClientHandler, ClientOptions};
 pub use protocol::{
-    decode, encode, valid_event_name, valid_id, valid_namespace_name, valid_offset, Frame,
-    ProtocolError, Serializer, DEFAULT_MAX_BYTES,
+    DEFAULT_MAX_BYTES, Frame, ProtocolError, Serializer, decode, encode, valid_event_name,
+    valid_id, valid_namespace_name, valid_offset,
 };
 pub use server::{AuthInfo, Context, Handler, Options, Server};
 

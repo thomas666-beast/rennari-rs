@@ -1,4 +1,4 @@
-use rennari::protocol::{decode, encode, valid_event_name, Frame, ProtocolError, Serializer};
+use rennari::protocol::{Frame, ProtocolError, Serializer, decode, encode, valid_event_name};
 
 fn from_hex(s: &str) -> Vec<u8> {
     let clean: String = s.chars().filter(|c| !c.is_whitespace()).collect();

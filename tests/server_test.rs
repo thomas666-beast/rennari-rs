@@ -6,7 +6,7 @@ use serde_json::json;
 use tokio::net::TcpListener;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use rennari::protocol::{decode, encode, Frame, Serializer};
+use rennari::protocol::{Frame, Serializer, decode, encode};
 use rennari::server::{Handler, Options, Server};
 
 async fn start_server(

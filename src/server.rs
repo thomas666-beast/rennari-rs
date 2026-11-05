@@ -1,17 +1,17 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::Router;
 use axum::extract::State;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
 use futures_util::{SinkExt, StreamExt};
 use rand::RngCore;
 use serde_json::Value;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
-use crate::protocol::{decode, encode, Frame, Serializer, DEFAULT_MAX_BYTES};
+use crate::protocol::{DEFAULT_MAX_BYTES, Frame, Serializer, decode, encode};
 
 pub type Handler = Arc<dyn Fn(&Context, Value) -> Option<Value> + Send + Sync>;
 pub type AuthCb = Arc<dyn Fn(&AuthInfo) -> Option<Value> + Send + Sync>;
@@ -109,7 +109,7 @@ pub struct Session {
     pub buffered: Vec<(i64, Vec<u8>)>,
     pub conn_id: i64,
     pub offline: bool,
-    pub gen: u64,
+    pub generation: u64,
 }
 
 #[derive(Clone)]
@@ -320,7 +320,7 @@ async fn handle_socket(socket: WebSocket, server: Arc<Server>, identity: Value) 
                     buffered: Vec::new(),
                     conn_id: id,
                     offline: false,
-                    gen: 0,
+                    generation: 0,
                 },
             );
         }
@@ -332,13 +332,13 @@ async fn handle_socket(socket: WebSocket, server: Arc<Server>, identity: Value) 
 
     {
         let s = server.state.lock().await;
-        if s.options.recovery {
-            if let Some(conn) = s.connections.get(&conn_id) {
-                let session_id = conn.session_id.clone();
-                let frame = Frame::new("rennari_session", serde_json::json!({"id": session_id}));
-                if let Ok(bytes) = encode(&frame, s.options.serializer) {
-                    let _ = conn.outbox.send(bytes);
-                }
+        if s.options.recovery
+            && let Some(conn) = s.connections.get(&conn_id)
+        {
+            let session_id = conn.session_id.clone();
+            let frame = Frame::new("rennari_session", serde_json::json!({"id": session_id}));
+            if let Ok(bytes) = encode(&frame, s.options.serializer) {
+                let _ = conn.outbox.send(bytes);
             }
         }
     }
@@ -566,7 +566,7 @@ async fn handle_resume(server: &Arc<Server>, conn_id: i64, data: &Value) {
         sess.buffered.clear();
         sess.conn_id = conn_id;
         sess.offline = false;
-        sess.gen += 1;
+        sess.generation += 1;
     }
 }
 
@@ -607,29 +607,28 @@ async fn on_close(server: &Arc<Server>, conn_id: i64) {
     let window = s.options.recovery_window_secs;
     let server_clone = server.clone();
 
-    if recovery {
-        if let Some(sess) = s.sessions.get_mut(&session_id) {
-            sess.namespaces = namespaces;
-            sess.rooms = rooms_by_nsp;
-            sess.conn_id = conn_id;
-            sess.offline = true;
-            sess.gen += 1;
-            let gen = sess.gen;
-            let sid = session_id.clone();
-            drop(s);
-            tokio::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(window)).await;
-                let mut s = server_clone.state.lock().await;
-                if let Some(cur) = s.sessions.get(&sid) {
-                    if cur.offline && cur.gen == gen {
-                        let cid = cur.conn_id;
-                        s.sessions.remove(&sid);
-                        s.connections.remove(&cid);
-                    }
-                }
-            });
-            return;
-        }
+    if recovery && let Some(sess) = s.sessions.get_mut(&session_id) {
+        sess.namespaces = namespaces;
+        sess.rooms = rooms_by_nsp;
+        sess.conn_id = conn_id;
+        sess.offline = true;
+        sess.generation += 1;
+        let generation = sess.generation;
+        let sid = session_id.clone();
+        drop(s);
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(window)).await;
+            let mut s = server_clone.state.lock().await;
+            if let Some(cur) = s.sessions.get(&sid)
+                && cur.offline
+                && cur.generation == generation
+            {
+                let cid = cur.conn_id;
+                s.sessions.remove(&sid);
+                s.connections.remove(&cid);
+            }
+        });
+        return;
     }
     s.connections.remove(&conn_id);
 }
@@ -725,24 +724,24 @@ impl Context {
 
     pub async fn join(&self, room: &str) {
         let mut s = self.server.lock().await;
-        if let Some(ns) = s.namespaces.get_mut(&self.namespace) {
-            if ns.members.contains(&self.conn_id) {
-                ns.rooms
-                    .entry(room.to_string())
-                    .or_default()
-                    .insert(self.conn_id);
-            }
+        if let Some(ns) = s.namespaces.get_mut(&self.namespace)
+            && ns.members.contains(&self.conn_id)
+        {
+            ns.rooms
+                .entry(room.to_string())
+                .or_default()
+                .insert(self.conn_id);
         }
     }
 
     pub async fn leave(&self, room: &str) {
         let mut s = self.server.lock().await;
-        if let Some(ns) = s.namespaces.get_mut(&self.namespace) {
-            if let Some(m) = ns.rooms.get_mut(room) {
-                m.remove(&self.conn_id);
-                if m.is_empty() {
-                    ns.rooms.remove(room);
-                }
+        if let Some(ns) = s.namespaces.get_mut(&self.namespace)
+            && let Some(m) = ns.rooms.get_mut(room)
+        {
+            m.remove(&self.conn_id);
+            if m.is_empty() {
+                ns.rooms.remove(room);
             }
         }
     }

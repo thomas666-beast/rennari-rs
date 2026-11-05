@@ -542,6 +542,7 @@ dependencies = [
  "axum",
  "futures-util",
  "hex",
+ "http",
  "rand",
  "regex",
  "rmp-serde",

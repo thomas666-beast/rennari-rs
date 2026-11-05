@@ -4,11 +4,12 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
-use tokio::sync::{mpsc, oneshot, Mutex};
+use tokio::sync::{Mutex, mpsc, oneshot};
 use tokio::task::JoinHandle;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-use crate::protocol::{decode, encode, Frame, ProtocolError, Serializer, DEFAULT_MAX_BYTES};
+use crate::protocol::{DEFAULT_MAX_BYTES, Frame, ProtocolError, Serializer, decode, encode};
 
 pub type ClientHandler = Arc<dyn Fn(Value) + Send + Sync>;
 
@@ -82,8 +83,6 @@ impl Client {
     }
 
     pub async fn connect(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-
         let mut request = self.url.as_str().into_client_request()?;
         for (k, v) in &self.options.extra_headers {
             request.headers_mut().insert(
@@ -112,10 +111,10 @@ impl Client {
         let reader = tokio::spawn(async move {
             while let Some(msg) = stream.next().await {
                 let Ok(msg) = msg else { break };
-                if let Message::Binary(bytes) = msg {
-                    if let Ok(frame) = decode(&bytes, serializer, max_bytes) {
-                        dispatch_frame(state.clone(), frame).await;
-                    }
+                if let Message::Binary(bytes) = msg
+                    && let Ok(frame) = decode(&bytes, serializer, max_bytes)
+                {
+                    dispatch_frame(state.clone(), frame).await;
                 }
             }
             let _ = writer.await;

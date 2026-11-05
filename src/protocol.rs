@@ -141,15 +141,15 @@ pub fn encode(frame: &Frame, serializer: Serializer) -> Result<Vec<u8>, Protocol
     if !valid_event_name(&frame.event) {
         return Err(ProtocolError::InvalidEventName);
     }
-    if let Some(id) = frame.id {
-        if !valid_id(id) {
-            return Err(ProtocolError::InvalidId);
-        }
+    if let Some(id) = frame.id
+        && !valid_id(id)
+    {
+        return Err(ProtocolError::InvalidId);
     }
-    if let Some(off) = frame.offset {
-        if !valid_offset(off) {
-            return Err(ProtocolError::InvalidOffset);
-        }
+    if let Some(off) = frame.offset
+        && !valid_offset(off)
+    {
+        return Err(ProtocolError::InvalidOffset);
     }
 
     let nsp = if frame.namespace.is_empty() || frame.namespace == "/" {
@@ -203,15 +203,15 @@ pub fn decode(
     if !valid_event_name(&raw.e) {
         return Err(ProtocolError::InvalidEventName);
     }
-    if let Some(id) = raw.id {
-        if !valid_id(id) {
-            return Err(ProtocolError::InvalidId);
-        }
+    if let Some(id) = raw.id
+        && !valid_id(id)
+    {
+        return Err(ProtocolError::InvalidId);
     }
-    if let Some(off) = raw.o {
-        if !valid_offset(off) {
-            return Err(ProtocolError::InvalidOffset);
-        }
+    if let Some(off) = raw.o
+        && !valid_offset(off)
+    {
+        return Err(ProtocolError::InvalidOffset);
     }
     let namespace = match raw.n {
         Some(ref n) if valid_namespace_name(n) => n.clone(),
